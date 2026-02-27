@@ -1,0 +1,4 @@
+.DS_Store
+test/*/test
+test/*/with-skill
+test/*/without-skill

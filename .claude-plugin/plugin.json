@@ -1,0 +1,13 @@
+{
+  "name": "glyph",
+  "version": "0.1.0",
+  "description": "Idiomatic patterns for building terminal UIs with the glyph Go framework",
+  "author": {
+    "name": "kungfusheep",
+    "url": "https://github.com/kungfusheep"
+  },
+  "homepage": "https://useglyph.sh",
+  "repository": "https://github.com/kungfusheep/glyph-skill",
+  "license": "Apache-2.0",
+  "keywords": ["go", "tui", "terminal", "glyph", "framework"]
+}
