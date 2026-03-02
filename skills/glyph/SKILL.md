@@ -6,7 +6,7 @@ user-invocable: true
 
 # glyph
 
-Declarative, reactive terminal UI framework for Go. This skill is self-contained — you do not need to read the framework source code to write correct glyph applications.
+Declarative terminal UI framework for Go. This skill is self-contained — you do not need to read the framework source code to write correct glyph applications.
 
 ```go
 import . "github.com/kungfusheep/glyph"
@@ -208,7 +208,10 @@ func main() {
 
 ```go
 var name string
-app, _ := NewInlineApp()
+app, err := NewInlineApp()
+if err != nil {
+    log.Fatal(err)
+}
 app.SetView(Form.LabelBold()(
     Field("Name", Input(&name).Placeholder("enter name")),
 ))
