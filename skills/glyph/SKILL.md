@@ -1,18 +1,18 @@
 ---
 name: glyph
-description: Idiomatic patterns for building terminal UIs with the glyph Go framework. Use when helping a developer write, debug, or extend a glyph application.
+description: Idiomatic patterns for the glyph Go TUI framework. Use when the user is writing, debugging, or extending a glyph application, when code imports github.com/kungfusheep/glyph, or when asked to build a terminal UI in Go.
 user-invocable: true
 ---
 
 # glyph
 
-Declarative terminal UI framework for Go. This skill is self-contained — you do not need to read the framework source code to write correct glyph applications.
+Declarative terminal UI framework for Go. Always refer to useglyph.sh/api for the full API reference before assuming an API does not exist.
+
+Use dot-import:
 
 ```go
 import . "github.com/kungfusheep/glyph"
 ```
-
-The dot-import is idiomatic — it keeps view code readable.
 
 ## How glyph works
 
@@ -23,6 +23,27 @@ You declare a view tree once. glyph compiles it to a template. Every frame, it d
 - Bind dynamic values with pointers (`&name`, `&items`)
 - Mutate the pointed-to value, then call `app.RequestRender()` from goroutines (handlers auto-render)
 - Use `If`/`Switch`/`ForEach` inside the tree for conditional/dynamic content — not Go control flow around `SetView`
+
+## Guidelines for writing glyph code
+
+**Use the functional API — not the struct API**
+glyph has two APIs: a legacy struct API (`VBoxNode{Children: []any{...}}`, `TextNode{Content: &name}`) and the current functional API (`VBox(children...)`, `Text(&name).Bold()`). Always use the functional API. The struct types still exist in the package but are no longer idiomatic and should not be used in new code.
+
+```go
+// wrong — struct API
+VBoxNode{Children: []any{TextNode{Content: &name}}}
+
+// correct — functional API
+VBox(Text(&name))
+```
+
+**Use text alignment styles**
+Instead of manually padding strings, use `Style{Align: AlignCenter}` or `Style{Align: AlignRight}` with a fixed-width container:
+
+```go
+Text("centered").Style(Style{Align: AlignCenter}).Width(40)
+Text("right-aligned").Style(Style{Align: AlignRight}).Width(40)
+```
 
 ## Complete example: single-view app
 
@@ -62,7 +83,7 @@ func main() {
     )
 
     app.Handle("j", func() { count++; countLabel = fmt.Sprintf("%d", count) })
-    app.Handle("k", func() { count--; countLabel = fmt.Sprintf("%d", count) })
+    app.gHandle("k", func() { count--; countLabel = fmt.Sprintf("%d", count) })
     app.Handle("q", app.Stop)
 
     go func() {
@@ -72,7 +93,9 @@ func main() {
         }
     }()
 
-    app.Run()
+    if err := app.Run(); err != nil {
+        log.Fatal(err)
+    }
 }
 ```
 
@@ -107,28 +130,26 @@ func main() {
     logs := []string{}
     showError := false
 
-    // extract background work into a named function — reuse from submit and retry
+    // extract as named func — reused from submit and retry handlers
     deploy := func() {
-        activeStep = steps[0]
         progress = 0
         progressLabel = "0%"
         logs = nil
+        showError = false
         app.RequestRender()
         go func() {
             for i, step := range steps {
                 activeStep = step
-                for p := i * 25; p < (i+1)*25; p++ {
-                    time.Sleep(50 * time.Millisecond)
-                    progress = p
-                    progressLabel = fmt.Sprintf("%d%%", p)
-                    if p == 75 {
-                        logs = append(logs, "ERROR: health check failed")
-                        showError = true
-                        app.RequestRender()
-                        return
-                    }
+                app.RequestRender()
+                time.Sleep(500 * time.Millisecond)
+                if i == 2 {
+                    logs = append(logs, "ERROR: health check failed")
+                    showError = true
                     app.RequestRender()
+                    return
                 }
+                progress = (i + 1) * 25
+                progressLabel = fmt.Sprintf("%d%%", progress)
                 logs = append(logs, fmt.Sprintf("%s complete", step))
                 app.RequestRender()
             }
@@ -200,24 +221,45 @@ func main() {
         }
     }()
 
-    app.RunFrom("form")
+    if err := app.RunFrom("form"); err != nil {
+        log.Fatal(err)
+    }
 }
 ```
 
 ## Complete example: inline prompt
 
+`Input()` without a pointer returns an `*InputC` — read the value after `Run()` via `.Value()`.
+
 ```go
-var name string
-app, err := NewInlineApp()
-if err != nil {
-    log.Fatal(err)
+package main
+
+import (
+    "fmt"
+    "log"
+    . "github.com/kungfusheep/glyph"
+)
+
+func main() {
+    name := Input().Placeholder("your name").Width(30)
+    token := Input().Placeholder("ghp_...").Width(30).Mask('*')
+
+    app, err := NewInlineApp()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    app.ClearOnExit(true).
+        SetView(Form.LabelFG(Cyan)(
+            Field("Name", name),
+            Field("Token", token),
+        )).
+        Handle("<Enter>", app.Stop).
+        Handle("<Escape>", app.Stop).
+        Run()
+
+    fmt.Printf("name=%q token=%q\n", name.Value(), token.Value())
 }
-app.SetView(Form.LabelBold()(
-    Field("Name", Input(&name).Placeholder("enter name")),
-))
-app.ClearOnExit(true)
-app.Run()
-fmt.Println("Hello,", name)
 ```
 
 ## Pitfalls
@@ -246,19 +288,19 @@ fmt.Println("Hello,", name)
 | `app.SetView(tree)` | set single view |
 | `app.View(name, tree) *ViewBuilder` | register named view |
 | `app.Handle(key, fn)` | key binding — handler is `func()` |
-| `app.Run()` | block until Stop |
-| `app.RunFrom(name)` | start on named view |
-| `app.RunNonInteractive()` | render-only, no input loop |
+| `app.Run() error` | block until Stop |
+| `app.RunFrom(name) error` | start on named view |
+| `app.RunNonInteractive() error` | render-only, no input loop (inline only) |
 | `app.Go(name)` | switch view |
+| `app.Back()` | return to previous view |
 | `app.PushView(name)` / `app.PopView()` | modal view stack |
 | `app.Stop()` | exit |
 | `app.RequestRender()` | schedule re-render (thread-safe) |
-| `app.RenderNow()` | immediate render |
 | `app.JumpKey(key)` | enable easymotion-style jump labels |
 | `app.Height(h)` | set inline app height |
 | `app.ClearOnExit(bool)` | clear on exit (inline) |
-
-ViewBuilder: `.Handle(key, fn)`, `.NoCounts()`.
+| `app.OnBeforeRender(fn)` | callback before each render — use to sync derived state |
+| `vb.Handle(key, fn)` / `vb.NoCounts()` | ViewBuilder — returned by `app.View()` |
 
 ### Layout
 
@@ -376,3 +418,5 @@ Special keys: `<Enter>`, `<Escape>`, `<Tab>`, `<S-Tab>`, `<Space>`, `<Backspace>
 | Scoped block | `Define(func() any { ... })` | local helpers at compile time |
 | Log viewer | `Log(reader)` | streaming text from `io.Reader` |
 | Filterable log | `FilterLog(reader)` | log with fzf search |
+
+If a component or method is not listed here, check useglyph.sh/api before concluding it does not exist.
