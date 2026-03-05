@@ -83,7 +83,7 @@ func main() {
     )
 
     app.Handle("j", func() { count++; countLabel = fmt.Sprintf("%d", count) })
-    app.gHandle("k", func() { count--; countLabel = fmt.Sprintf("%d", count) })
+    app.Handle("k", func() { count--; countLabel = fmt.Sprintf("%d", count) })
     app.Handle("q", app.Stop)
 
     go func() {
@@ -336,16 +336,49 @@ Border styles: `BorderRounded`, `BorderSingle`, `BorderDouble`.
 Spinner frame sets: `SpinnerBraille`, `SpinnerDots`, `SpinnerLine`, `SpinnerCircle`.
 Tab styles: `TabsStyleUnderline`, `TabsStyleBox`, `TabsStyleBracket`.
 
+**String display helpers** — return `string`, compose into `Text()` or format into a `*string`:
+
+| Function | Signature | Output |
+|---|---|---|
+| LED indicator | `LED(on bool) string` | `●` or `○` |
+| Multiple LEDs | `LEDs(states ...bool) string` | `●●○` |
+| Bracketed LEDs | `LEDsBracket(states ...bool) string` | `[●●○]` |
+| Segmented bar | `Bar(filled, total int) string` | `▮▮▮▯▯` |
+| Bracketed bar | `BarBracket(filled, total int) string` | `[▮▮▮▯▯]` |
+| Analog meter | `Meter(value, max, width int) string` | `├──●──┤` |
+
 ### Lists
 
 | Component | Constructor | State type | Key options |
 |---|---|---|---|
-| Navigable list | `List[T](&items)` | `*[]T` | `.Selection(&int)` `.Render(fn)` `.OnSelect(fn)` `.Marker(s)` `.MarkerStyle(s)` `.MaxVisible(n)` `.SelectedStyle(s)` `.BindNav(down,up)` `.BindVimNav()` |
-| Filterable list | `FilterList[T](&items, extractFn)` | `*[]T` | `.Placeholder(s)` `.Render(fn)` `.MaxVisible(n)` `.Handle(key, fn)` `.HandleClear(key, fn)` |
-| Checkbox list | `CheckList[T](&items)` | `*[]T` | `.Render(fn)` `.BindNav(d,u)` `.BindToggle(key)` `.BindDelete(key)` |
+| Navigable list | `List[T](&items)` | `*[]T` | `.Selection(&int)` `.Render(fn)` `.OnSelect(fn)` `.Marker(s)` `.MarkerStyle(s)` `.MaxVisible(n)` `.SelectedStyle(s)` `.BindNav(down,up)` `.BindVimNav()` `.Ref(fn)` |
+| Filterable list | `FilterList[T](&items, extractFn)` | `*[]T` | `.Placeholder(s)` `.Render(fn)` `.MaxVisible(n)` `.Border(style)` `.Title(s)` `.Handle(key, fn)` `.HandleClear(key, fn)` `.Ref(fn)` |
+| Checkbox list | `CheckList[T](&items)` | `*[]T` | `.Render(fn)` `.Checked(fn)` `.BindNav(d,u)` `.BindToggle(key)` `.BindDelete(key)` `.Ref(fn)` |
 | Iteration | `ForEach[T](&items, fn)` | `*[]T` | — |
 
 FilterList query syntax: `foo` fuzzy, `'exact`, `^prefix`, `suffix$`, `!negate`, `a b` AND, `a | b` OR.
+
+**CheckList struct tags** — if items are structs, tag fields to avoid manual `.Checked()` and `.Render()` calls:
+
+```go
+type Task struct {
+    Name    string `glyph:"render"`
+    Done    bool   `glyph:"checked"`
+}
+
+CheckList(&tasks)  // render and checked resolved via struct tags
+```
+
+Without struct tags, configure manually: `.Render(func(t *Task) any { return Text(&t.Name) })` and `.Checked(func(t *Task) *bool { return &t.Done })`.
+
+**`.Ref()` pattern** — captures a handle to a component at build time for later use:
+
+```go
+var myList *ListC[Item]
+List(&items).Render(fn).Ref(func(l *ListC[Item]) { myList = l })
+```
+
+`.Ref()` is available on `List`, `CheckList`, `FilterList`, `Log`, `FilterLog`, `Input`, `Checkbox`, `Radio`, and `App`/`ViewBuilder`.
 
 ### Tables
 
@@ -368,6 +401,19 @@ Column formatters: `Number(decimals)`, `Percent(decimals)`, `Currency(symbol, de
 Validators: `VRequired`, `VEmail`, `VMinLen(n)`, `VMaxLen(n)`, `VMatch(regex)`, `VTrue`.
 Trigger flags: `VOnChange`, `VOnBlur`, `VOnSubmit`.
 
+**Raw text input outside forms** — use `TextInput` struct + `app.BindField()` when an input is not inside a `Form`:
+
+```go
+var field InputState
+
+app.BindField(&field)  // routes unmatched keystrokes to this field
+
+// in view tree:
+TextInput{Field: &field, Placeholder: "search..."}
+```
+
+`InputState` bundles `Value string` and `Cursor int`. Call `field.Clear()` to reset. For multiple focusable fields share a `FocusGroup` and set `FocusIndex` on each `TextInput`.
+
 ### Conditionals
 
 | Pattern | Usage |
@@ -378,6 +424,8 @@ Trigger flags: `VOnChange`, `VOnBlur`, `VOnSubmit`.
 | Multi-way | `Switch(&strVar).Case("a", viewA).Case("b", viewB).Default(viewC)` |
 
 IfOrd operators: `.Gt()`, `.Lt()`, `.Gte()`, `.Lte()`, `.Eq()`, `.Ne()`.
+
+`Switch` requires `.End()` when it is not the last child in a container — omitting it causes a compile error.
 
 ### Styling
 
@@ -416,7 +464,7 @@ Special keys: `<Enter>`, `<Escape>`, `<Tab>`, `<S-Tab>`, `<Space>`, `<Backspace>
 | Layer view | `LayerView(&layer)` | scrollable pre-rendered buffer |
 | Custom widget | `Widget(measureFn, renderFn)` | fully custom rendering |
 | Scoped block | `Define(func() any { ... })` | local helpers at compile time |
-| Log viewer | `Log(reader)` | streaming text from `io.Reader` |
-| Filterable log | `FilterLog(reader)` | log with fzf search |
+| Log viewer | `Log(reader)` | streaming text from `io.Reader`. `.BindVimNav()` to scroll with j/k/ctrl-d/ctrl-u |
+| Filterable log | `FilterLog(reader)` | log with fzf search. `.BindVimNav()` to scroll |
 
 If a component or method is not listed here, check useglyph.sh/api before concluding it does not exist.
