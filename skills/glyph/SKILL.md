@@ -16,24 +16,24 @@ import . "github.com/kungfusheep/glyph"
 
 ## How glyph works
 
-You declare a view tree once. glyph compiles it to a template. Every frame, it dereferences your pointers to read current state. No diffing, no rebuild.
+You declare a view tree once. glyph compiles it to a template. Every frame, it dereferences your pointers to read current state.
 
 **Rules:**
-- Call `SetView` or `app.View()` once — never in a loop
+- Call `SetView` or `app.View()` once. Never in a loop.
 - Bind dynamic values with pointers (`&name`, `&items`)
 - Mutate the pointed-to value, then call `app.RequestRender()` from goroutines (handlers auto-render)
-- Use `If`/`Switch`/`ForEach` inside the tree for conditional/dynamic content — not Go control flow around `SetView`
+- Use `If`/`Switch`/`ForEach` inside the tree for conditional/dynamic content, not Go control flow around `SetView`
 
 ## Guidelines for writing glyph code
 
-**Use the functional API — not the struct API**
-glyph has two APIs: a legacy struct API (`VBoxNode{Children: []any{...}}`, `TextNode{Content: &name}`) and the current functional API (`VBox(children...)`, `Text(&name).Bold()`). Always use the functional API. The struct types still exist in the package but are no longer idiomatic and should not be used in new code.
+**Use the functional API, not the struct API**
+glyph has two APIs: a legacy struct API (`VBoxNode{Children: []any{...}}`, `TextNode{Content: &name}`) and the current functional API (`VBox(children...)`, `Text(&name).Bold()`). Always use the functional API. The struct types still exist in the package but are no longer idiomatic.
 
 ```go
-// wrong — struct API
+// wrong: struct API
 VBoxNode{Children: []any{TextNode{Content: &name}}}
 
-// correct — functional API
+// correct: functional API
 VBox(Text(&name))
 ```
 
@@ -130,7 +130,7 @@ func main() {
     logs := []string{}
     showError := false
 
-    // extract as named func — reused from submit and retry handlers
+    // named func; reused from submit and retry handlers
     deploy := func() {
         progress = 0
         progressLabel = "0%"
@@ -213,7 +213,7 @@ func main() {
         Handle("r", func() { if showError { showError = false; deploy() } }).
         Handle("c", func() { if showError { showError = false; app.Go("form") } })
 
-    // spinner animation — always running
+    // spinner animation; always running
     go func() {
         for range time.Tick(80 * time.Millisecond) {
             frame++
@@ -229,7 +229,7 @@ func main() {
 
 ## Complete example: inline prompt
 
-`Input()` without a pointer returns an `*InputC` — read the value after `Run()` via `.Value()`.
+`Input()` without a pointer returns an `*InputC`. Read the value after `Run()` via `.Value()`.
 
 ```go
 package main
@@ -255,8 +255,11 @@ func main() {
             Field("Token", token),
         )).
         Handle("<Enter>", app.Stop).
-        Handle("<Escape>", app.Stop).
-        Run()
+        Handle("<Escape>", app.Stop)
+
+    if err := app.Run(); err != nil {
+        log.Fatal(err)
+    }
 
     fmt.Printf("name=%q token=%q\n", name.Value(), token.Value())
 }
@@ -266,16 +269,16 @@ func main() {
 
 | Mistake | Correct |
 |---|---|
-| `Text(&myInt)` — renders nothing | `Text` only accepts `string` or `*string`. Format numbers into a `*string` first. |
-| `WidthPct(30)` — means 3000% | `WidthPct(0.3)` — scale is 0.0–1.0 |
-| `Progress(&myFloat)` | `Progress(&myInt)` — takes `*int`, range 0–100 |
-| Expecting spinner to animate | You must increment `frame` yourself in a goroutine |
+| `Text(&myInt)` renders nothing | `Text` only accepts `string` or `*string`. Format numbers into a `*string` first. |
+| `WidthPct(30)` means 3000% | `WidthPct(0.3)`, scale is 0.0–1.0 |
+| `Progress(&myFloat)` | `Progress(&myInt)` takes `*int`, range 0–100 |
+| Expecting spinner to animate | Increment `frame` yourself in a goroutine |
 | Calling `SetView` in a loop | Call once, mutate pointers, call `RequestRender()` |
 | Go `if/else` around `SetView` | Use `If(&val).Then(...).Else(...)` inside the tree |
-| `RequestRender()` in a handler | Not needed — handlers auto-render |
-| Forgetting `RequestRender()` in goroutine | Required — goroutines don't auto-render |
+| `RequestRender()` in a handler | handlers auto-render |
+| Forgetting `RequestRender()` in goroutine | goroutines don't auto-render |
 | Digits not reaching text input | Add `.NoCounts()` to the view |
-| Importing `riffkey` directly | Not needed — use `func()` handler signatures. `riffkey` is an internal dependency. |
+| Importing `riffkey` directly | use `func()` handler signatures; `riffkey` is an internal dependency |
 
 ## API reference
 
@@ -287,7 +290,7 @@ func main() {
 | `NewInlineApp()` | inline app (renders at cursor) |
 | `app.SetView(tree)` | set single view |
 | `app.View(name, tree) *ViewBuilder` | register named view |
-| `app.Handle(key, fn)` | key binding — handler is `func()` |
+| `app.Handle(key, fn)` | key binding; handler is `func()` |
 | `app.Run() error` | block until Stop |
 | `app.RunFrom(name) error` | start on named view |
 | `app.RunNonInteractive() error` | render-only, no input loop (inline only) |
@@ -299,8 +302,8 @@ func main() {
 | `app.JumpKey(key)` | enable easymotion-style jump labels |
 | `app.Height(h)` | set inline app height |
 | `app.ClearOnExit(bool)` | clear on exit (inline) |
-| `app.OnBeforeRender(fn)` | callback before each render — use to sync derived state |
-| `vb.Handle(key, fn)` / `vb.NoCounts()` | ViewBuilder — returned by `app.View()` |
+| `app.OnBeforeRender(fn)` | callback before each render. Use for derived state. |
+| `vb.Handle(key, fn)` / `vb.NoCounts()` | ViewBuilder; returned by `app.View()` |
 
 ### Layout
 
@@ -336,7 +339,7 @@ Border styles: `BorderRounded`, `BorderSingle`, `BorderDouble`.
 Spinner frame sets: `SpinnerBraille`, `SpinnerDots`, `SpinnerLine`, `SpinnerCircle`.
 Tab styles: `TabsStyleUnderline`, `TabsStyleBox`, `TabsStyleBracket`.
 
-**String display helpers** — return `string`, compose into `Text()` or format into a `*string`:
+**String display helpers** return `string`. Use inside `Text()` or format into a `*string`:
 
 | Function | Signature | Output |
 |---|---|---|
@@ -358,7 +361,7 @@ Tab styles: `TabsStyleUnderline`, `TabsStyleBox`, `TabsStyleBracket`.
 
 FilterList query syntax: `foo` fuzzy, `'exact`, `^prefix`, `suffix$`, `!negate`, `a b` AND, `a | b` OR.
 
-**CheckList struct tags** — if items are structs, tag fields to avoid manual `.Checked()` and `.Render()` calls:
+**CheckList struct tags**: tag struct fields and glyph resolves `.Checked()` and `.Render()` from them:
 
 ```go
 type Task struct {
@@ -371,7 +374,7 @@ CheckList(&tasks)  // render and checked resolved via struct tags
 
 Without struct tags, configure manually: `.Render(func(t *Task) any { return Text(&t.Name) })` and `.Checked(func(t *Task) *bool { return &t.Done })`.
 
-**`.Ref()` pattern** — captures a handle to a component at build time for later use:
+**`.Ref()`** captures a component handle at build time:
 
 ```go
 var myList *ListC[Item]
@@ -401,7 +404,7 @@ Column formatters: `Number(decimals)`, `Percent(decimals)`, `Currency(symbol, de
 Validators: `VRequired`, `VEmail`, `VMinLen(n)`, `VMaxLen(n)`, `VMatch(regex)`, `VTrue`.
 Trigger flags: `VOnChange`, `VOnBlur`, `VOnSubmit`.
 
-**Raw text input outside forms** — use `TextInput` struct + `app.BindField()` when an input is not inside a `Form`:
+**TextInput outside forms.** Use `TextInput` + `app.BindField()` for standalone text input:
 
 ```go
 var field InputState
@@ -425,7 +428,7 @@ TextInput{Field: &field, Placeholder: "search..."}
 
 IfOrd operators: `.Gt()`, `.Lt()`, `.Gte()`, `.Lte()`, `.Eq()`, `.Ne()`.
 
-`Switch` requires `.End()` when it is not the last child in a container — omitting it causes a compile error.
+`Switch` requires `.End()` when it is not the last child in a container; omitting it is a compile error.
 
 ### Styling
 
@@ -435,7 +438,7 @@ Style struct: `Style{FG: c, BG: c, Fill: c, Attr: AttrBold | AttrItalic, Align: 
 
 Attributes: `AttrBold`, `AttrDim`, `AttrItalic`, `AttrUnderline`, `AttrInverse`, `AttrStrikethrough`.
 
-CascadeStyle applies a style to a container — children inherit, can override:
+CascadeStyle applies a style to a container. Children inherit it and can override:
 ```go
 theme := Style{FG: Cyan}
 VBox.CascadeStyle(&theme)(children...)
@@ -467,4 +470,4 @@ Special keys: `<Enter>`, `<Escape>`, `<Tab>`, `<S-Tab>`, `<Space>`, `<Backspace>
 | Log viewer | `Log(reader)` | streaming text from `io.Reader`. `.BindVimNav()` to scroll with j/k/ctrl-d/ctrl-u |
 | Filterable log | `FilterLog(reader)` | log with fzf search. `.BindVimNav()` to scroll |
 
-If a component or method is not listed here, check useglyph.sh/api before concluding it does not exist.
+Check useglyph.sh/api for anything not listed here.
