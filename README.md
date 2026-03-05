@@ -1,8 +1,8 @@
 # glyph skill for Claude Code
 
-A Claude Code plugin that gives Claude idiomatic knowledge of [glyph](https://useglyph.sh) — the declarative terminal UI framework for Go.
+A Claude Code plugin that gives Claude idiomatic knowledge of [glyph](https://useglyph.sh), a declarative terminal UI framework for Go.
 
-Once installed, Claude automatically applies correct glyph patterns when you're working on a glyph application. No need to prompt it.
+Once installed, Claude reads the skill and applies correct glyph patterns when you're working on a glyph application.
 
 ## Install
 
@@ -22,9 +22,9 @@ Claude activates automatically when your code imports `github.com/kungfusheep/gl
 
 ## What it covers
 
-- Core mental model — how the template/pointer system works
+- Core mental model: how the template system works
 - Complete examples for single-view, multi-view, and inline apps
 - Full API reference for layout, display, lists, tables, forms, conditionals, and styling
-- Common pitfalls and how to avoid them
+- Common pitfalls
 
 Full API docs at [useglyph.sh/api](https://useglyph.sh/api).
